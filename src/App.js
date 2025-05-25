@@ -1,222 +1,216 @@
 import React, { useState, useEffect } from "react";
 
-const BASE_URL = "https://fullstack-backend-gak5.onrender.com";
+const API_URL = "https://todo-backend-zey7.onrender.com";
 
-function App() {
+export default function UniqueTodo() {
   const [tasks, setTasks] = useState([]);
-  const [newTitle, setNewTitle] = useState("");
+  const [draft, setDraft] = useState("");
   const [filter, setFilter] = useState("all");
+  const [editing, setEditing] = useState(null);
+  const [editValue, setEditValue] = useState("");
   const [darkMode, setDarkMode] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [editText, setEditText] = useState("");
+
+  // Toggle dark-mode class on body for full page effect
+  useEffect(() => {
+    if (darkMode) document.body.classList.add("dark-mode");
+    else document.body.classList.remove("dark-mode");
+  }, [darkMode]);
 
   useEffect(() => {
-    loadTasks(filter);
+    (async () => {
+      try {
+        let url = `${API_URL}/tasks`;
+        if (filter === "completed") url += "?completed=true";
+        else if (filter === "pending") url += "?completed=false";
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Fetch error");
+        const data = await response.json();
+        setTasks(data);
+      } catch (e) {
+        alert(e.message);
+      }
+    })();
   }, [filter]);
 
-  async function loadTasks(filterVal) {
-    try {
-      let url = `${BASE_URL}/tasks`;
-      if (filterVal === "completed") url += "?completed=true";
-      else if (filterVal === "pending") url += "?completed=false";
-
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to fetch tasks");
-      const data = await res.json();
-      setTasks(data);
-    } catch (error) {
-      alert(error.message);
-    }
-  }
-
-  async function handleAddTask(e) {
+  async function addTask(e) {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!draft.trim()) return;
 
     try {
-      const res = await fetch(`${BASE_URL}/tasks`, {
+      const res = await fetch(`${API_URL}/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: newTitle.trim() }),
+        body: JSON.stringify({ title: draft.trim() }),
       });
-      if (!res.ok) throw new Error("Failed to create task");
-      const created = await res.json();
-      setTasks((prev) => [...prev, created]);
-      setNewTitle("");
-    } catch (error) {
-      alert(error.message);
+      if (!res.ok) throw new Error("Add failed");
+      const newTask = await res.json();
+      setTasks((prev) => [...prev, newTask]);
+      setDraft("");
+    } catch (e) {
+      alert(e.message);
     }
   }
 
-  async function handleToggleComplete(task) {
+  async function toggleTask(task) {
     try {
-      const res = await fetch(`${BASE_URL}/tasks/${task.id}`, {
+      const res = await fetch(`${API_URL}/tasks/${task.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: task.title, completed: !task.completed }),
       });
-      if (!res.ok) throw new Error("Failed to update task");
+      if (!res.ok) throw new Error("Toggle failed");
       const updated = await res.json();
-      setTasks((prev) =>
-        prev.map((t) => (t.id === updated.id ? updated : t))
-      );
-    } catch (error) {
-      alert(error.message);
+      setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    } catch (e) {
+      alert(e.message);
     }
   }
 
-  async function handleDeleteTask(id) {
+  async function deleteTask(id) {
     try {
-      const res = await fetch(`${BASE_URL}/tasks/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to delete task");
+      const res = await fetch(`${API_URL}/tasks/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
       setTasks((prev) => prev.filter((t) => t.id !== id));
-    } catch (error) {
-      alert(error.message);
+    } catch (e) {
+      alert(e.message);
     }
   }
 
-  function startEditing(task) {
-    setEditingId(task.id);
-    setEditText(task.title);
+  function startEdit(task) {
+    setEditing(task.id);
+    setEditValue(task.title);
   }
 
-  function cancelEditing() {
-    setEditingId(null);
-    setEditText("");
+  function cancelEdit() {
+    setEditing(null);
+    setEditValue("");
   }
 
-  async function saveEditing(task) {
-    if (!editText.trim()) return alert("Task title cannot be empty");
+  async function saveEdit(task) {
+    if (!editValue.trim()) return alert("Cannot be empty");
     try {
-      const res = await fetch(`${BASE_URL}/tasks/${task.id}`, {
+      const res = await fetch(`${API_URL}/tasks/${task.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: editText.trim(), completed: task.completed }),
+        body: JSON.stringify({ title: editValue.trim(), completed: task.completed }),
       });
-      if (!res.ok) throw new Error("Failed to update task");
+      if (!res.ok) throw new Error("Save failed");
       const updated = await res.json();
-      setTasks((prev) =>
-        prev.map((t) => (t.id === updated.id ? updated : t))
-      );
-      cancelEditing();
-    } catch (error) {
-      alert(error.message);
+      setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      cancelEdit();
+    } catch (e) {
+      alert(e.message);
     }
   }
 
   return (
-    <div className={darkMode ? "app dark-mode" : "app"}>
-      <header>
-        <h1>Cozy To-Do List</h1>
+    <main className="unique-wrapper">
+      <header className="header-bar">
+        <h1 className="main-title">your tasks</h1>
         <button
-          aria-label="Toggle dark mode"
           className="dark-toggle"
           onClick={() => setDarkMode((d) => !d)}
+          aria-label="Toggle dark mode"
+          type="button"
         >
-          {darkMode ? "🌞 Light" : "🌙 Dark"}
+          {darkMode ? "☀️ Light" : "🌙 Dark"}
         </button>
       </header>
 
-      <form onSubmit={handleAddTask} className="task-form" autoComplete="off">
+      <form className="invisible-form" onSubmit={addTask} noValidate>
         <input
-          type="text"
-          placeholder="What do you want to do today?"
-          value={newTitle}
-          onChange={(e) => setNewTitle(e.target.value)}
-          className="task-input"
+          className="ghost-input"
+          placeholder="press enter to add..."
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          spellCheck="false"
+          aria-label="Add new task"
         />
-        <button type="submit" className="btn-primary">
-          Add Task
-        </button>
       </form>
 
-      <nav className="filters" role="navigation" aria-label="Task Filters">
+      <nav className="filter-links" aria-label="task filters">
         {["all", "completed", "pending"].map((f) => (
-          <button
+          <span
             key={f}
             onClick={() => setFilter(f)}
-            className={`filter-btn ${filter === f ? "active" : ""}`}
-            aria-pressed={filter === f}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === "Enter" && setFilter(f)}
+            className={`filter-item ${filter === f ? "selected" : ""}`}
           >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
+            {f}
+          </span>
         ))}
       </nav>
 
-      <ul className="task-list" aria-live="polite">
-        {tasks.length === 0 && <li className="no-tasks">No tasks yet</li>}
+      <ul className="task-lines" aria-live="polite">
+        {tasks.length === 0 && <li className="empty-message">no tasks found</li>}
 
         {tasks.map((task) => (
-          <li
-            key={task.id}
-            className={`task-item ${task.completed ? "completed" : ""}`}
-          >
-            <input
-              type="checkbox"
-              checked={task.completed}
-              onChange={() => handleToggleComplete(task)}
-              id={`chk-${task.id}`}
-              aria-label={`Mark ${task.title} as ${task.completed ? "incomplete" : "complete"}`}
-            />
-            {editingId === task.id ? (
-              <>
+          <li key={task.id} className="task-line">
+            <label
+              className={`task-text ${task.completed ? "done" : ""}`}
+              onDoubleClick={() => startEdit(task)}
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && startEdit(task)}
+              aria-label={`Toggle task ${task.title}`}
+            >
+              <input
+                type="checkbox"
+                checked={task.completed}
+                onChange={() => toggleTask(task)}
+                tabIndex={-1}
+                aria-hidden="true"
+              />
+              {editing === task.id ? (
                 <input
                   type="text"
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  className="edit-input"
-                  aria-label={`Edit task ${task.title}`}
+                  className="edit-line"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
                   autoFocus
+                  spellCheck="false"
+                  aria-label={`Editing ${task.title}`}
                 />
+              ) : (
+                <span>{task.title}</span>
+              )}
+            </label>
+
+            {editing === task.id ? (
+              <>
                 <button
-                  onClick={() => saveEditing(task)}
-                  className="btn-save"
-                  aria-label="Save changes"
+                  className="text-btn save-btn"
+                  onClick={() => saveEdit(task)}
+                  aria-label="save task"
                 >
-                  Save
+                  ✓
                 </button>
                 <button
-                  onClick={cancelEditing}
-                  className="btn-cancel"
-                  aria-label="Cancel editing"
+                  className="text-btn cancel-btn"
+                  onClick={cancelEdit}
+                  aria-label="cancel editing"
                 >
-                  Cancel
+                  ✕
                 </button>
               </>
             ) : (
-              <>
-                <label
-                  htmlFor={`chk-${task.id}`}
-                  onDoubleClick={() => startEditing(task)}
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") startEditing(task);
-                  }}
-                  className="task-label"
-                  title="Double-click or press Enter to edit"
-                >
-                  {task.title}
-                </label>
-                <button
-                  onClick={() => handleDeleteTask(task.id)}
-                  className="btn-delete"
-                  aria-label={`Delete task ${task.title}`}
-                >
-                  🗑️
-                </button>
-              </>
+              <button
+                className="text-btn delete-btn"
+                onClick={() => deleteTask(task.id)}
+                aria-label={`delete ${task.title}`}
+              >
+                🗑
+              </button>
             )}
           </li>
         ))}
       </ul>
 
-      <footer className="footer">
-        * Double-click or press Enter on a task to edit it.
-      </footer>
-    </div>
+      <p className="hint-text">
+        double-click or hit enter on task to edit • press enter to add
+      </p>
+    </main>
   );
 }
-
-export default App;
